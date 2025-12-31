@@ -1,6 +1,6 @@
 import { View, Text, TouchableOpacity, Alert, Platform } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -66,6 +66,17 @@ export default function WorkoutScreen() {
     setIsActive(false);
   };
   
+  const handleRequestPermission = useCallback(async () => {
+    try {
+      const result = await requestPermission();
+      if (!result.granted) {
+        Alert.alert("권한 거부", "카메라 권한이 필요합니다.");
+      }
+    } catch (error) {
+      Alert.alert("오류", "권한 요청 중 오류가 발생했습니다.");
+    }
+  }, [requestPermission]);
+  
   const handleComplete = async () => {
     if (count === 0) {
       Alert.alert("알림", "운동 기록이 없습니다.");
@@ -104,7 +115,7 @@ export default function WorkoutScreen() {
           운동 측정을 위해 카메라 권한이 필요합니다.
         </Text>
         <TouchableOpacity
-          onPress={requestPermission}
+          onPress={handleRequestPermission}
           className="bg-primary px-6 py-3 rounded-full"
         >
           <Text className="text-background font-semibold">권한 허용</Text>

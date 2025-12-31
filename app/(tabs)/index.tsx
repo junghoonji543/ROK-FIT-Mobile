@@ -9,7 +9,7 @@ import { useData } from "@/lib/data-provider";
 export default function HomeScreen() {
   const colors = useColors();
   const { exercises, workoutRecords, userProfile, isLoading } = useData();
-  const [currentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(new Date());
   
   // 캘린더 데이터 생성
   const year = currentDate.getFullYear();
@@ -86,13 +86,23 @@ export default function HomeScreen() {
           <View className="bg-surface rounded-2xl p-6 shadow-sm border border-border">
             {/* 캘린더 헤더 */}
             <View className="flex-row items-center justify-between mb-4">
-              <TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  const newDate = new Date(year, month - 1, 1);
+                  setCurrentDate(newDate);
+                }}
+              >
                 <IconSymbol name="chevron.left" size={24} color={colors.foreground} />
               </TouchableOpacity>
               <Text className="text-xl font-bold text-foreground">
                 {year}년 {monthNames[month]}
               </Text>
-              <TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  const newDate = new Date(year, month + 1, 1);
+                  setCurrentDate(newDate);
+                }}
+              >
                 <IconSymbol name="chevron.right" size={24} color={colors.foreground} />
               </TouchableOpacity>
             </View>
