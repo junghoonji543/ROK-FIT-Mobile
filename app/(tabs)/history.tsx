@@ -1,21 +1,32 @@
 import { ScrollView, Text, View, TouchableOpacity, FlatList, Alert } from "react-native";
 import { useState, useMemo } from "react";
+import { router, useLocalSearchParams } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
 import { useData } from "@/lib/data-provider";
 import { useColors } from "@/hooks/use-colors";
 
 export default function HistoryScreen() {
+  const { selectedDate } = useLocalSearchParams<{ selectedDate?: string }>();
   const colors = useColors();
   const { exercises, workoutRecords, deleteWorkoutRecord } = useData();
   const [selectedFilter, setSelectedFilter] = useState<string>("all");
 
   // 필터링된 기록
   const filteredRecords = useMemo(() => {
-    if (selectedFilter === "all") {
-      return workoutRecords;
+    let records = workoutRecords;
+    
+    // 날짜 필터링 (달력에서 선택한 경우)
+    if (selectedDate) {
+      records = records.filter((record) => record.date === selectedDate);
     }
-    return workoutRecords.filter((record) => record.exerciseId === selectedFilter);
-  }, [workoutRecords, selectedFilter]);
+    
+    // 운동 종목 필터링
+    if (selectedFilter !== "all") {
+      records = records.filter((record) => record.exerciseId === selectedFilter);
+    }
+    
+    return records;
+  }, [workoutRecords, selectedFilter, selectedDate]);
 
   // 운동 종목 이름 가져오기
   const getExerciseName = (exerciseId: string) => {
@@ -111,33 +122,30 @@ export default function HistoryScreen() {
             data={filteredRecords}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
-              <View className="bg-surface rounded-2xl p-4 mb-4 border border-border">
-                <View className="flex-row items-center justify-between">
-                  <View className="flex-row items-center flex-1">
-                    <View className="w-12 h-12 rounded-full bg-background items-center justify-center mr-4">
-                      <Text className="text-2xl">{getExerciseIcon(item.exerciseId)}</Text>
+              <TouchableOpacity
+                onPress={() => router.push({ pathname: "/record/[id]" as any, params: { id: item.id } })}
+                activeOpacity={0.7}
+              >
+                <View className="bg-surface rounded-2xl p-4 mb-4 border border-border">
+                  <View className="flex-row items-center justify-between">
+                    <View className="flex-row items-center flex-1">
+                      <View className="w-12 h-12 rounded-full bg-background items-center justify-center mr-4">
+                        <Text className="text-2xl">{getExerciseIcon(item.exerciseId)}</Text>
+                      </View>
+                      <View className="flex-1">
+                        <Text className="text-lg font-bold text-foreground">
+                          {getExerciseName(item.exerciseId)}
+                        </Text>
+                        <Text className="text-sm text-muted">{formatDate(item.date)}</Text>
+                      </View>
                     </View>
-                    <View className="flex-1">
-                      <Text className="text-lg font-bold text-foreground">
-                        {getExerciseName(item.exerciseId)}
-                      </Text>
-                      <Text className="text-sm text-muted">{formatDate(item.date)}</Text>
+                    <View className="items-end">
+                      <Text className="text-2xl font-bold text-primary">{item.count}</Text>
+                      <Text className="text-sm text-muted">회</Text>
                     </View>
                   </View>
-                  <View className="items-end">
-                    <Text className="text-2xl font-bold text-primary">{item.count}</Text>
-                    <Text className="text-sm text-muted">회</Text>
-                  </View>
                 </View>
-                <View className="flex-row justify-end mt-2">
-                  <TouchableOpacity
-                    onPress={() => handleDelete(item.id, getExerciseName(item.exerciseId))}
-                    className="px-4 py-2 rounded-full bg-error/10"
-                  >
-                    <Text className="text-error font-semibold text-sm">삭제</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
+              </TouchableOpacity>
             )}
             showsVerticalScrollIndicator={false}
           />

@@ -123,7 +123,20 @@ export default function HomeScreen() {
                 const hasWorkout = day && workoutDays.includes(day);
                 
                 return (
-                  <View key={index} className="w-[14.28%] aspect-square items-center justify-center p-1">
+                  <TouchableOpacity
+                    key={index}
+                    className="w-[14.28%] aspect-square items-center justify-center p-1"
+                    onPress={() => {
+                      if (day) {
+                        const selectedDate = new Date(year, month, day).toISOString().split("T")[0];
+                        router.push({
+                          pathname: "/(tabs)/history" as any,
+                          params: { selectedDate },
+                        });
+                      }
+                    }}
+                    disabled={!day}
+                  >
                     {day ? (
                       <View className="w-full h-full items-center justify-center">
                         <View
@@ -144,7 +157,7 @@ export default function HomeScreen() {
                         )}
                       </View>
                     ) : null}
-                  </View>
+                  </TouchableOpacity>
                 );
               })}
             </View>

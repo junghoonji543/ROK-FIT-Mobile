@@ -8,6 +8,7 @@ import { useColors } from "@/hooks/use-colors";
 import { useData } from "@/lib/data-provider";
 import type { WorkoutRecord } from "@/lib/types";
 import * as Haptics from "expo-haptics";
+import { initializePoseDetector, analyzePushup, analyzeSitup, disposePoseDetector } from "@/lib/pose-detector";
 
 export default function WorkoutScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -20,14 +21,100 @@ export default function WorkoutScreen() {
   const [count, setCount] = useState(0);
   const [angle, setAngle] = useState(0);
   const [status, setStatus] = useState<"Ready" | "Down" | "Up">("Ready");
+  const [isPoseDetectorReady, setIsPoseDetectorReady] = useState(false);
+  const [lastDetectionTime, setLastDetectionTime] = useState(0);
+  const [previousState, setPreviousState] = useState(false);
   
   const exercise = exercises.find((e) => e.id === id);
   
-  // 간단한 카운팅 시뮬레이션 (실제로는 포즈 감지 필요)
-  const simulateWorkout = () => {
-    if (!isActive) return;
+  // 포즈 감지 모델 초기화
+  useEffect(() => {
+    const initPoseDetector = async () => {
+      try {
+        if (Platform.OS === "web") {
+          await initializePoseDetector();
+          setIsPoseDetectorReady(true);
+        }
+      } catch (error) {
+        console.error("포즈 감지 모델 초기화 실패:", error);
+      }
+    };
     
-    // 임시: 3초마다 자동으로 카운트 증가
+    initPoseDetector();
+    
+    return () => {
+      disposePoseDetector();
+    };
+  }, []);
+  
+  // 웹에서 포즈 감지 기반 카운팅
+  const detectAndCountWorkout = useCallback(async () => {
+    if (!isActive || !isPoseDetectorReady || Platform.OS !== "web") return;
+    
+    try {
+      const video = document.querySelector("video");
+      if (!video) return;
+      
+      const { detectPose } = await import("@/lib/pose-detector");
+      const poses = await detectPose(video);
+      
+      if (poses.length === 0) return;
+      
+      const pose = poses[0];
+      const now = Date.now();
+      
+      // 운동 종목에 따른 분석
+      let result: any;
+      if (exercise?.id === "pushup") {
+        result = analyzePushup(pose);
+      } else if (exercise?.id === "situp") {
+        result = analyzeSitup(pose);
+      } else {
+        result = analyzePushup(pose);
+      }
+      
+      // 신뢰도 확인
+      if (result.confidence < 0.5) return;
+      
+      setAngle(result.angle);
+      setStatus(result.isDown || result.isUp ? "Down" : "Up");
+      
+      // 상태 변화 감지 (0.5초 이상 간격)
+      if (now - lastDetectionTime > 500) {
+        if (result.isDown && !previousState) {
+          setCount((prev) => {
+            const newCount = prev + 1;
+            if (Platform.OS !== "web") {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            }
+            return newCount;
+          });
+          setPreviousState(true);
+        } else if (!result.isDown && previousState) {
+          setPreviousState(false);
+        }
+        setLastDetectionTime(now);
+      }
+    } catch (error) {
+      console.error("포즈 감지 오류:", error);
+    }
+  }, [isActive, isPoseDetectorReady, exercise?.id, lastDetectionTime, previousState]);
+  
+  // 웹에서 포즈 감지 루프
+  useEffect(() => {
+    if (!isActive || Platform.OS !== "web") return;
+    
+    const interval = setInterval(() => {
+      detectAndCountWorkout();
+    }, 100);
+    
+    return () => clearInterval(interval);
+  }, [isActive, detectAndCountWorkout]);
+  
+  // 모바일에서 간단한 시뮬레이션
+  const simulateWorkout = useCallback(() => {
+    if (!isActive || Platform.OS === "web") return;
+    
     const interval = setInterval(() => {
       setCount((prev) => {
         const newCount = prev + 1;
@@ -41,13 +128,13 @@ export default function WorkoutScreen() {
     }, 3000);
     
     return () => clearInterval(interval);
-  };
+  }, [isActive]);
   
   useEffect(() => {
-    if (isActive) {
+    if (isActive && Platform.OS !== "web") {
       return simulateWorkout();
     }
-  }, [isActive]);
+  }, [isActive, simulateWorkout]);
   
   const handleStart = () => {
     setIsActive(true);
@@ -152,6 +239,15 @@ export default function WorkoutScreen() {
               </Text>
             </View>
           </View>
+          
+          {/* 포즈 감지 상태 표시 (웹) */}
+          {Platform.OS === "web" && (
+            <View className="absolute top-4 right-4 bg-black/70 rounded-lg px-3 py-2">
+              <Text className="text-white text-xs">
+                {isPoseDetectorReady ? "✓ 포즈 감지 준비됨" : "⏳ 모델 로딩중..."}
+              </Text>
+            </View>
+          )}
           
           {/* 하단 상태 카드 */}
           <View className="absolute bottom-0 left-0 right-0 p-6">
